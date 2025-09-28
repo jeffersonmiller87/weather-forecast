@@ -23,7 +23,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -59,7 +58,7 @@ class ForecastServiceTest {
 
     @Test
     void getForecast_shouldFetchFromApiAndPutCache_whenCacheMisses() {
-        when(forecastCache.get(ZIP_CODE)).thenReturn(null);
+        when(forecastCache.get(ZIP_CODE, ForecastDto.class)).thenReturn(null);
         when(nominatimClient.getCoordinates(anyString()))
                 .thenReturn(createMockLocationDto());
         when(openMeteoClient.getForecast(anyString(), anyString()))
@@ -69,7 +68,6 @@ class ForecastServiceTest {
 
         verify(nominatimClient, times(1)).getCoordinates(anyString());
         verify(openMeteoClient, times(1)).getForecast(anyString(), anyString());
-        verify(forecastCache, times(1)).put(eq(ZIP_CODE), any(ForecastDto.class));
 
         assertEquals(CURRENT_TEMP, result.getCurrent().temperature_2m(), "Temperature must match.");
         assertFalse(result.isFromCache(), "Result must NOT be from cache on first call.");
@@ -77,13 +75,14 @@ class ForecastServiceTest {
 
     @Test
     void getForecast_shouldReturnFromCache_whenCacheHits() {
-        when(forecastCache.get(ZIP_CODE)).thenReturn(this::createMockForecastDto);
+        when(forecastCache.get(ZIP_CODE, ForecastDto.class)).thenReturn(createMockForecastDto());
 
         ForecastDto result = forecastService.getForecast(ZIP_CODE);
 
         verify(nominatimClient, never()).getCoordinates(anyString());
         verify(openMeteoClient, never()).getForecast(anyString(), anyString());
         verify(forecastCache, never()).put(anyString(), any(ForecastDto.class));
+        verify(forecastCache, times(1)).get(ZIP_CODE, ForecastDto.class);
 
         assertEquals(CURRENT_TEMP, result.getCurrent().temperature_2m(), "Temperature must match cached value.");
         assertTrue(result.isFromCache(), "Result must be from cache.");
@@ -91,13 +90,26 @@ class ForecastServiceTest {
 
     @Test
     void getForecast_shouldThrowException_whenGeocodingFails() {
-        when(forecastCache.get(ZIP_CODE)).thenReturn(null);
+        when(forecastCache.get(ZIP_CODE, ForecastDto.class)).thenReturn(null);
         when(nominatimClient.getCoordinates(anyString())).thenReturn(Collections.emptyList());
 
         assertThrows(RuntimeException.class, () -> forecastService.getForecast(ZIP_CODE),
                 "Should throw if nominatim get coordinates returns no results.");
 
         verify(openMeteoClient, never()).getForecast(anyString(), anyString());
+    }
+
+    @Test
+    void getForecast_shouldThrowException_whenForecastFails() {
+        when(forecastCache.get(ZIP_CODE, ForecastDto.class)).thenReturn(null);
+        when(nominatimClient.getCoordinates(anyString())).thenReturn(createMockLocationDto());
+        when(openMeteoClient.getForecast(anyString(), anyString())).thenReturn(null);
+
+        assertThrows(RuntimeException.class, () -> forecastService.getForecast(ZIP_CODE),
+                "Should throw if openMeteo forecast returns no results.");
+
+        verify(nominatimClient, times(1)).getCoordinates(anyString());
+        verify(openMeteoClient, times(1)).getForecast(anyString(), anyString());
     }
 
     private List<LocationDto> createMockLocationDto() {

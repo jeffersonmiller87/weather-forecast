@@ -7,6 +7,7 @@ import com.project.weather.model.ForecastDto;
 import com.project.weather.model.LocationDto;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.CachePut;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -26,18 +27,16 @@ public class ForecastService {
     public ForecastDto getForecast(String zipCode) {
         Cache cache = cacheManager.getCache(CacheConfig.FORECASTS_CACHE);
         if (cache != null) {
-            Cache.ValueWrapper cachedValue = cache.get(zipCode);
-            if (cachedValue != null) {
-                ForecastDto forecast = (ForecastDto) cachedValue.get();
-                if (forecast != null) {
-                    forecast.setFromCache(true);
-                    return forecast;
+            ForecastDto cachedForecast = cache.get(zipCode, ForecastDto.class);
+                if (cachedForecast != null) {
+                    cachedForecast.setFromCache(true);
+                    return cachedForecast;
                 }
-            }
         }
         return fetchForecast(zipCode);
     }
 
+    @CachePut(value = CacheConfig.FORECASTS_CACHE, key = "#zipCode")
     private ForecastDto fetchForecast(String zipCode) {
         List<LocationDto> locationResponse = nominatimClient.getCoordinates(zipCode);
         if (locationResponse == null || locationResponse.isEmpty()) {
@@ -46,9 +45,9 @@ public class ForecastService {
         LocationDto locationDto = locationResponse.getFirst();
         ForecastDto forecastDto = openMeteoClient.getForecast(locationDto.lat(), locationDto.lon());
 
-        Cache cache = cacheManager.getCache(CacheConfig.FORECASTS_CACHE);
-        if (cache != null) {
-            cache.put(zipCode, forecastDto);
+        if (forecastDto == null) {
+            throw new RuntimeException(String.format("Could not get Weather Forecast for latitude: %s and longitude %s",
+                    locationDto.lat(), locationDto.lon()));
         }
 
         return forecastDto;
