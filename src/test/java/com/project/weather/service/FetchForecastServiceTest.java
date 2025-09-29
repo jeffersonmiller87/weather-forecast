@@ -2,6 +2,8 @@ package com.project.weather.service;
 
 import com.project.weather.client.NominatimClient;
 import com.project.weather.client.OpenMeteoClient;
+import com.project.weather.exception.ForecastException;
+import com.project.weather.exception.LocationNotFoundException;
 import com.project.weather.model.CurrentDto;
 import com.project.weather.model.ForecastDto;
 import com.project.weather.model.LocationDto;
@@ -58,7 +60,7 @@ class FetchForecastServiceTest {
     void getForecast_shouldThrowException_whenGeocodingFails() {
         when(nominatimClient.getCoordinates(anyString())).thenReturn(Collections.emptyList());
 
-        assertThrows(RuntimeException.class, () -> fetchForecastService.fetchForecast(ZIP_CODE),
+        assertThrows(LocationNotFoundException.class, () -> fetchForecastService.fetchForecast(ZIP_CODE),
                 "Should throw if nominatim get coordinates returns no results.");
 
         verify(openMeteoClient, never()).getForecast(anyString(), anyString());
@@ -69,7 +71,7 @@ class FetchForecastServiceTest {
         when(nominatimClient.getCoordinates(anyString())).thenReturn(createMockLocationDto());
         when(openMeteoClient.getForecast(anyString(), anyString())).thenReturn(null);
 
-        assertThrows(RuntimeException.class, () -> fetchForecastService.fetchForecast(ZIP_CODE),
+        assertThrows(ForecastException.class, () -> fetchForecastService.fetchForecast(ZIP_CODE),
                 "Should throw if openMeteo forecast returns no results.");
 
         verify(nominatimClient, times(1)).getCoordinates(anyString());

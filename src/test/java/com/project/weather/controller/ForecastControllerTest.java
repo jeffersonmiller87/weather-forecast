@@ -3,7 +3,6 @@ package com.project.weather.controller;
 import com.project.weather.model.CurrentDto;
 import com.project.weather.model.ForecastDto;
 import com.project.weather.service.ForecastService;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -46,10 +45,28 @@ class ForecastControllerTest {
     }
 
     @Test
-    void getForecast_shouldReturnNotFound_onInvalidZipCode() throws Exception {
+    void getForecast_shouldReturnNotFound_onNullZipCode() throws Exception {
         mockMvc.perform(get("/api/forecast/")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNotFound());
+
+        verify(forecastService, never()).getForecast(anyString());
+    }
+
+    @Test
+    void getForecast_shouldReturnNotFound_onBlankZipCode() throws Exception {
+        mockMvc.perform(get("/api/forecast/ ")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotAcceptable());
+
+        verify(forecastService, never()).getForecast(anyString());
+    }
+
+    @Test
+    void getForecast_shouldReturnNotFound_onInvalidFormatZipCode() throws Exception {
+        mockMvc.perform(get("/api/forecast/823.123")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotAcceptable());
 
         verify(forecastService, never()).getForecast(anyString());
     }
